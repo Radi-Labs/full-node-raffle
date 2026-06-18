@@ -82,7 +82,7 @@ def _gate():
     if not _PASSWORD:
         return None
     # allow the verifier page through without a password — it's public
-    if request.path == "/verify.html":
+    if request.path == "/verify.html" or request.path.startswith("/enter/"):
         return None
     auth = request.authorization
     if auth and _check_auth(auth.password):
@@ -259,3 +259,64 @@ def do_draw(round_id):
 
 if __name__ == "__main__":
     app.run(debug=True, port=int(os.environ.get("PORT", 5000)))
+
+
+# ---------------------------------------------------------------------------
+# Public routes (no auth required)
+# ---------------------------------------------------------------------------
+
+@app.route("/enter/<round_id>")
+def public_enter_form(round_id):
+    """Public-facing entry page for node operators."""
+    try:
+        rnd = store().load(round_id)
+    except KeyError:
+        return f"Round {round_id!r} not found.", 404
+    return render_template("enter.html", r=rnd, Status=Status)
+
+
+@app.route("/enter/<round_id>", methods=["POST"])
+def public_enter(round_id):
+    """Handle a self-service entry submission."""
+    s = store()
+    try:
+        rnd = s.load(round_id)
+    except KeyError:
+        return f"Round {round_id!r} not found.", 404
+
+    npub = request.form.get("npub", "").strip()
+    ip = request.form.get("ip", "").strip()
+    port = int(request.form.get("port", 8333) or 8333)
+
+    if not npub:
+        flash("An npub is required.", "error")
+        return redirect(url_for("public_enter_form", round_id=round_id))
+    if not ip:
+        flash("Your node IP address is required.", "error")
+        return redirect(url_for("public_enter_form", round_id=round_id))
+
+    result = check_node(ip, port)
+    if not result.reachable:
+        flash(
+            f"Could not reach a Bitcoin node at {ip}:{port} — {result.error}. "
+            "Make sure port 8333 is open and your node is synced.",
+            "error",
+        )
+        return redirect(url_for("public_enter_form", round_id=round_id))
+
+    try:
+        added = rnd.add_entry(npub, source_ip=ip)
+    except RuntimeError as e:
+        flash(str(e), "error")
+        return redirect(url_for("public_enter_form", round_id=round_id))
+
+    s.save(rnd)
+    if added:
+        flash(
+            f"You're in! Node verified ({result.user_agent}, height {result.start_height}). "
+            f"Your npub has been added to the entry list.",
+            "ok",
+        )
+    else:
+        flash("That npub is already entered in this round.", "warn")
+    return redirect(url_for("public_enter_form", round_id=round_id))
