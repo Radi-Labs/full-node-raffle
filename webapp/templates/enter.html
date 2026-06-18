@@ -15,15 +15,55 @@
       <div class="lbl">Entries so far</div>
     </div>
     <div class="hero-stat">
-      <div class="val">{{ r.draw_block_height | string | replace('0', '0') }}</div>
+      <div class="val">{{ r.draw_block_height }}</div>
       <div class="lbl">Draw block</div>
     </div>
+    {% if r.prize_address %}
     <div class="hero-stat">
-      <div class="val">{{ r.max_entries_per_ip }}</div>
-      <div class="lbl">Max per IP</div>
+      <div class="val" id="pool-btc">—</div>
+      <div class="lbl">Prize pool (BTC)</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if r.prize_address %}
+<div class="panel donate-panel" id="donate-section">
+  <div class="donate-inner">
+    <div class="donate-left">
+      <h2>Donate to the prize pool</h2>
+      <p class="donate-sub">Send any amount of bitcoin to this address. All donations go directly to the winner.</p>
+      <div class="addr-box">
+        <span class="addr-text" id="btc-addr">{{ r.prize_address }}</span>
+        <button class="copy-btn" onclick="copyAddr()">Copy</button>
+      </div>
+      <div class="pool-stats">
+        <div class="pool-stat">
+          <span class="pool-val" id="pool-confirmed">—</span>
+          <span class="pool-lbl">confirmed BTC</span>
+        </div>
+        <div class="pool-stat">
+          <span class="pool-val" id="pool-unconfirmed">—</span>
+          <span class="pool-lbl">unconfirmed</span>
+        </div>
+        <div class="pool-stat">
+          <span class="pool-val" id="pool-txcount">—</span>
+          <span class="pool-lbl">donations</span>
+        </div>
+      </div>
+      <a class="mempool-link" id="mempool-link" href="https://mempool.space/address/{{ r.prize_address }}" target="_blank" rel="noopener">
+        View on mempool.space →
+      </a>
+    </div>
+    <div class="donate-right">
+      <div class="qr-wrap">
+        <canvas id="qr-canvas"></canvas>
+        <div class="qr-label">bitcoin:{{ r.prize_address[:10] }}…</div>
+      </div>
     </div>
   </div>
 </div>
+{% endif %}
 
 <div class="cols">
   <div>
@@ -70,14 +110,14 @@
           <div class="step-num">3</div>
           <div class="step-body">
             <div class="step-title">List sealed &amp; published</div>
-            <div class="step-desc">Entries are committed with SHA-256 and published as a signed Nostr event across multiple relays. It cannot be altered after this point.</div>
+            <div class="step-desc">Entries are committed with SHA-256 and published as a signed Nostr event. It cannot be altered after this point.</div>
           </div>
         </div>
         <div class="how-step">
           <div class="step-num">4</div>
           <div class="step-body">
             <div class="step-title">Provably fair draw</div>
-            <div class="step-desc">Block {{ r.draw_block_height }}'s hash picks the winner: <code>hash mod N</code>. Anyone can recompute it independently.</div>
+            <div class="step-desc">Block {{ r.draw_block_height }}'s hash picks the winner: <code>hash mod N</code>. Anyone can recompute it.</div>
           </div>
         </div>
       </div>
@@ -123,4 +163,49 @@
 
 {% endif %}
 
-{% endblock %}
+{% if r.prize_address %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const ADDR = {{ r.prize_address | tojson }};
+const SAT  = 100_000_000;
+
+// QR code
+new QRCode(document.getElementById("qr-canvas"), {
+  text: "bitcoin:" + ADDR,
+  width: 180, height: 180,
+  colorDark: "#F7931A", colorLight: "#141C1A",
+  correctLevel: QRCode.CorrectLevel.M
+});
+
+// Live balance from mempool.space
+async function loadBalance() {
+  try {
+    const r = await fetch("https://mempool.space/api/address/" + ADDR);
+    if (!r.ok) return;
+    const d = await r.json();
+    const confirmed   = (d.chain_stats.funded_txo_sum - d.chain_stats.spent_txo_sum) / SAT;
+    const unconfirmed = (d.mempool_stats.funded_txo_sum - d.mempool_stats.spent_txo_sum) / SAT;
+    const txcount     = d.chain_stats.tx_count + d.mempool_stats.tx_count;
+
+    const fmt = v => v.toFixed(v < 0.001 ? 8 : 5).replace(/\.?0+$/, '') || "0";
+    document.getElementById("pool-confirmed").textContent   = fmt(confirmed) + " BTC";
+    document.getElementById("pool-unconfirmed").textContent = unconfirmed > 0 ? "+" + fmt(unconfirmed) : "0";
+    document.getElementById("pool-txcount").textContent     = txcount;
+    const heroVal = document.getElementById("pool-btc");
+    if (heroVal) heroVal.textContent = fmt(confirmed + unconfirmed);
+  } catch (e) { /* mempool.space unreachable — silently fail */ }
+}
+loadBalance();
+
+// Copy address
+function copyAddr() {
+  navigator.clipboard.writeText(ADDR).then(() => {
+    const btn = document.querySelector(".copy-btn");
+    btn.textContent = "Copied!";
+    btn.style.background = "var(--green)";
+    btn.style.color = "#04180E";
+    setTimeout(() => { btn.textContent = "Copy"; btn.style.background = ""; btn.style.color = ""; }, 2000);
+  });
+}
+</script>
+{% endif %}

@@ -149,12 +149,14 @@ def create():
         return redirect(url_for("index"))
     extra = int(request.form.get("extra_blocks", 0) or 0)
     max_per_ip = int(request.form.get("max_entries_per_ip", 1) or 1)
+    prize_address = request.form.get("prize_address", "").strip()
 
     s.save(RaffleRound(
         round_id=round_id,
         draw_block_height=draw_height,
         extra_blocks=extra,
         max_entries_per_ip=max_per_ip,
+        prize_address=prize_address,
     ))
     flash(f"Round {round_id!r} opened. Announce block {draw_height} publicly now.", "ok")
     return redirect(url_for("round_detail", round_id=round_id))

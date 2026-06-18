@@ -48,6 +48,7 @@ class RaffleRound:
     winner_index: int | None = None
     seed_hex: str | None = None
     max_entries_per_ip: int = _DEFAULT_MAX_PER_IP
+    prize_address: str = ""   # Bitcoin address for the prize pool
     # Maps IP address -> list of npubs entered from that IP. Not part of the
     # public entry list; used only for Sybil gating before entries close.
     ip_map: dict[str, list[str]] = field(default_factory=dict)
@@ -131,6 +132,7 @@ class RaffleRound:
         # ip_map may be absent in state files created before this field was added
         d.setdefault("ip_map", {})
         d.setdefault("max_entries_per_ip", _DEFAULT_MAX_PER_IP)
+        d.setdefault("prize_address", "")
         return cls(**d)
 
 
