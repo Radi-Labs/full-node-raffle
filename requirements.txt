@@ -1,0 +1,10 @@
+# Runtime dependencies for the node-runner raffle reference implementation.
+# Standard library covers the draw core, node check, and round state, so these
+# are only needed for the network-facing stages.
+
+requests>=2.31           # block hash lookups (blockchain.py, verify.py)
+nostr-sdk==0.44.2        # publishing the sealed entry list (nostr_publish.py)
+flask>=3.0               # operator dashboard (webapp/) — optional
+
+# Dev / test only:
+#   pytest>=8.0

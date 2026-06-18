@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verify the draw — Node-runner raffle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1416;          /* node-terminal background, not pure black */
+    --surface:#151D1F;
+    --surface-2:#1B2528;
+    --line:#263033;
+    --text:#E9E7DF;
+    --muted:#8B958F;
+    --verify:#46C08A;       /* the "reproduced / match" color — the semantic hero */
+    --verify-dim:#1E3A30;
+    --mismatch:#E0654E;
+    --btc:#F7931A;          /* used only for the prize + mark, sparingly */
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --display:'Space Grotesk',system-ui,sans-serif;
+    --body:'IBM Plex Sans',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--ink);color:var(--text);font-family:var(--body);
+    line-height:1.55;font-size:16px;
+    background-image:radial-gradient(circle at 50% -10%, #16211F 0%, var(--ink) 55%);
+    min-height:100vh;
+  }
+  .wrap{max-width:780px;margin:0 auto;padding:48px 24px 96px}
+  header{margin-bottom:40px}
+  .mark{display:flex;align-items:center;gap:10px;font-family:var(--mono);
+    font-size:13px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--btc);
+    box-shadow:0 0 12px 1px rgba(247,147,26,.5)}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,6vw,44px);
+    line-height:1.05;letter-spacing:-.02em;margin:18px 0 12px}
+  h1 .em{color:var(--verify)}
+  .lede{color:var(--muted);max-width:54ch;font-size:16px}
+  .lede code{font-family:var(--mono);color:var(--text);font-size:.9em}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:24px;margin-top:28px}
+  .panel + .panel{margin-top:18px}
+  .step{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
+  .step .n{font-family:var(--mono);font-size:12px;color:var(--verify);
+    border:1px solid var(--verify-dim);border-radius:5px;padding:2px 7px;flex:none}
+  .step h2{font-family:var(--display);font-weight:600;font-size:18px;margin:0;letter-spacing:-.01em}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 7px;letter-spacing:.01em}
+  textarea,input[type=text],input[type=number]{
+    width:100%;background:var(--ink);border:1px solid var(--line);border-radius:9px;
+    color:var(--text);font-family:var(--mono);font-size:13.5px;padding:12px 13px;
+    line-height:1.6;resize:vertical}
+  textarea{min-height:132px}
+  textarea:focus,input:focus{outline:none;border-color:var(--verify);
+    box-shadow:0 0 0 3px rgba(70,192,138,.13)}
+  .src{display:flex;gap:10px;margin-bottom:14px}
+  .src button{flex:1;background:var(--ink);border:1px solid var(--line);color:var(--muted);
+    font-family:var(--mono);font-size:12.5px;padding:9px;border-radius:8px;cursor:pointer;
+    transition:.15s}
+  .src button[aria-pressed=true]{border-color:var(--verify);color:var(--text);
+    background:var(--verify-dim)}
+  .src button:hover{color:var(--text)}
+  .field + .field{margin-top:14px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row .field{flex:1;min-width:160px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;font-family:var(--mono)}
+  .go{margin-top:8px;width:100%;background:var(--verify);color:#05130D;border:none;
+    font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:.01em;
+    padding:15px;border-radius:10px;cursor:pointer;transition:.15s}
+  .go:hover{filter:brightness(1.07)}
+  .go:disabled{opacity:.5;cursor:not-allowed}
+
+  /* signature element: the computation as a receipt */
+  .receipt{margin-top:28px;display:none}
+  .receipt.show{display:block;animation:rise .4s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.receipt.show{animation:none}}
+  .verdict{display:flex;align-items:center;gap:13px;padding:18px 22px;border-radius:12px;
+    border:1px solid var(--verify);background:var(--verify-dim);margin-bottom:2px}
+  .verdict.bad{border-color:var(--mismatch);background:#3A1E18}
+  .verdict .glyph{font-family:var(--mono);font-weight:700;font-size:20px;color:var(--verify)}
+  .verdict.bad .glyph{color:var(--mismatch)}
+  .verdict .t{font-family:var(--display);font-weight:600;font-size:17px}
+  .verdict .s{font-size:13px;color:var(--muted)}
+  .calc{background:var(--surface);border:1px solid var(--line);border-top:none;
+    border-radius:0 0 12px 12px;overflow:hidden}
+  .calc .line{display:flex;justify-content:space-between;gap:16px;padding:14px 22px;
+    border-top:1px solid var(--line);font-family:var(--mono);font-size:13px}
+  .calc .line:first-child{border-top:none}
+  .calc .k{color:var(--muted);flex:none}
+  .calc .v{text-align:right;word-break:break-all;color:var(--text)}
+  .calc .v.hash{font-size:12px;color:#B9C2BD}
+  /* the reduction, pulled out big */
+  .reduce{padding:22px;text-align:center;border-top:1px solid var(--line);
+    background:var(--surface-2);font-family:var(--mono)}
+  .reduce .expr{font-size:14px;color:var(--muted);word-break:break-all}
+  .reduce .expr b{color:var(--text);font-weight:500}
+  .reduce .out{font-family:var(--display);font-weight:700;font-size:34px;margin-top:6px;
+    color:var(--verify);letter-spacing:-.01em}
+  .winner{padding:22px;border-top:1px solid var(--line)}
+  .winner .lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;
+    margin-bottom:8px}
+  .winner .npub{font-family:var(--mono);font-size:15px;color:var(--btc);word-break:break-all;
+    font-weight:500}
+  .err{display:none;margin-top:18px;padding:14px 18px;border-radius:10px;
+    border:1px solid var(--mismatch);background:#33191490;color:#F0B6A8;
+    font-size:14px;font-family:var(--mono)}
+  .err.show{display:block}
+  footer{margin-top:48px;color:var(--muted);font-size:13px;line-height:1.7}
+  footer code{font-family:var(--mono);color:#B9C2BD;font-size:12.5px}
+  a{color:var(--verify)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark"><span class="dot"></span> Node-runner raffle · independent verifier</div>
+    <h1>Reproduce the draw <span class="em">yourself.</span></h1>
+    <p class="lede">No account, no server, no trust. Paste the entry list and the draw
+    block hash; this page recomputes the winner in your browser using
+    <code>seed mod N</code>. If it matches the announced result, the draw was honest.</p>
+  </header>
+
+  <div class="panel">
+    <div class="step"><span class="n">01</span><h2>The published entry list</h2></div>
+    <label for="entries">One npub per line, exactly as published on Nostr. Order doesn't matter — it gets sorted.</label>
+    <textarea id="entries" spellcheck="false" placeholder="npub1...&#10;npub1...&#10;npub1..."></textarea>
+  </div>
+
+  <div class="panel">
+    <div class="step"><span class="n">02</span><h2>The draw block</h2></div>
+    <div class="src">
+      <button id="tab-hash" aria-pressed="true">Paste block hash</button>
+      <button id="tab-height" aria-pressed="false">Look up by height</button>
+    </div>
+    <div id="pane-hash" class="field">
+      <label for="hashes">Block hash. One per line if the draw used several consecutive blocks.</label>
+      <textarea id="hashes" spellcheck="false" style="min-height:84px"
+        placeholder="0000000000000000000245f..."></textarea>
+    </div>
+    <div id="pane-height" class="field" style="display:none">
+      <div class="row">
+        <div class="field"><label for="height">Draw block height</label>
+          <input id="height" type="number" placeholder="920000"></div>
+        <div class="field"><label for="extra">Extra blocks (hardened seed)</label>
+          <input id="extra" type="number" value="0" min="0"></div>
+      </div>
+      <div class="hint">Fetched live from mempool.space. Cross-check on any explorer.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="step"><span class="n">03</span><h2>Announced winner <span style="color:var(--muted);font-weight:400;font-size:13px">— optional</span></h2></div>
+    <label for="claimed">Paste the npub the organizer announced, and this will confirm it matches.</label>
+    <input id="claimed" type="text" spellcheck="false" placeholder="npub1... (leave blank to just compute)">
+  </div>
+
+  <button class="go" id="run">Recompute the winner</button>
+  <div class="err" id="err"></div>
+
+  <div class="receipt" id="receipt">
+    <div class="verdict" id="verdict">
+      <span class="glyph" id="glyph">✓</span>
+      <div><div class="t" id="verdict-t">Winner reproduced</div>
+        <div class="s" id="verdict-s"></div></div>
+    </div>
+    <div class="calc">
+      <div class="line"><span class="k">Entries (N)</span><span class="v" id="r-n"></span></div>
+      <div class="line"><span class="k">Entry commitment (SHA-256)</span><span class="v hash" id="r-commit"></span></div>
+      <div class="line"><span class="k">Draw block hash</span><span class="v hash" id="r-hash"></span></div>
+      <div class="line"><span class="k">Seed (hex)</span><span class="v hash" id="r-seed"></span></div>
+      <div class="reduce">
+        <div class="expr">seed mod <b id="r-mod"></b> &nbsp;=&nbsp; index</div>
+        <div class="out" id="r-index"></div>
+      </div>
+      <div class="winner">
+        <div class="lab">Winning entry</div>
+        <div class="npub" id="r-winner"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    This is the same calculation as <code>verify.py</code> and the draw script, reimplemented
+    in client-side JavaScript so it depends on nothing you have to trust. Single block:
+    <code>int(blockhash, 16) mod N</code>. Several blocks:
+    <code>int(SHA-256(concatenated raw hash bytes)) mod N</code>.
+    Entries are stripped, de-duplicated, and sorted before hashing.
+  </footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// --- source tabs ---
+const tabHash = $('tab-hash'), tabHeight = $('tab-height');
+function setSource(mode){
+  const isHash = mode === 'hash';
+  tabHash.setAttribute('aria-pressed', isHash);
+  tabHeight.setAttribute('aria-pressed', !isHash);
+  $('pane-hash').style.display = isHash ? '' : 'none';
+  $('pane-height').style.display = isHash ? 'none' : '';
+}
+tabHash.onclick = () => setSource('hash');
+tabHeight.onclick = () => setSource('height');
+
+// --- the draw math (mirrors node_raffle/draw.py exactly) ---
+function canonicalEntries(text){
+  const set = new Set(
+    text.split('\n').map(s => s.trim()).filter(Boolean)
+  );
+  // Sort by code point to match Python's sorted() on str.
+  return [...set].sort((a,b) => a < b ? -1 : a > b ? 1 : 0);
+}
+async function sha256Hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function hexToBytes(hex){
+  const clean = hex.trim();
+  const out = new Uint8Array(clean.length/2);
+  for(let i=0;i<out.length;i++) out[i] = parseInt(clean.substr(i*2,2),16);
+  return out;
+}
+async function deriveSeed(hashes){
+  if(hashes.length === 1) return BigInt('0x' + hashes[0].trim());
+  // concat raw bytes, sha256, read as big integer
+  const total = hashes.reduce((n,h)=>n+hexToBytes(h).length,0);
+  const concat = new Uint8Array(total);
+  let off = 0;
+  for(const h of hashes){ const b = hexToBytes(h); concat.set(b,off); off += b.length; }
+  const digest = await crypto.subtle.digest('SHA-256', concat);
+  let seed = 0n;
+  for(const byte of new Uint8Array(digest)) seed = (seed << 8n) | BigInt(byte);
+  return seed;
+}
+
+async function fetchHashes(height, extra){
+  const base = 'https://mempool.space/api';
+  const out = [];
+  for(let h = height; h <= height + extra; h++){
+    const res = await fetch(`${base}/block-height/${h}`);
+    if(!res.ok) throw new Error(`block ${h} not found (tip too low? height wrong?)`);
+    out.push((await res.text()).trim());
+  }
+  return out;
+}
+
+function showErr(msg){
+  const e = $('err'); e.textContent = msg; e.classList.add('show');
+  $('receipt').classList.remove('show');
+}
+
+$('run').onclick = async () => {
+  $('err').classList.remove('show');
+  const btn = $('run'); btn.disabled = true; btn.textContent = 'Computing…';
+  try{
+    const entries = canonicalEntries($('entries').value);
+    if(entries.length === 0) throw new Error('Paste at least one npub in the entry list.');
+
+    let hashes;
+    if(tabHash.getAttribute('aria-pressed') === 'true'){
+      hashes = $('hashes').value.split('\n').map(s=>s.trim()).filter(Boolean);
+      if(hashes.length === 0) throw new Error('Paste the draw block hash.');
+      if(!hashes.every(h => /^[0-9a-fA-F]{64}$/.test(h)))
+        throw new Error('A block hash must be 64 hex characters.');
+    } else {
+      const height = parseInt($('height').value, 10);
+      const extra = Math.max(0, parseInt($('extra').value,10) || 0);
+      if(!Number.isInteger(height)) throw new Error('Enter the draw block height.');
+      hashes = await fetchHashes(height, extra);
+    }
+
+    const seed = await deriveSeed(hashes);
+    const n = BigInt(entries.length);
+    const index = Number(seed % n);
+    const winner = entries[index];
+    const commit = await sha256Hex(entries.join('\n'));
+
+    // fill receipt
+    $('r-n').textContent = entries.length;
+    $('r-commit').textContent = commit;
+    $('r-hash').textContent = hashes.join('  +  ');
+    $('r-seed').textContent = seed.toString(16);
+    $('r-mod').textContent = entries.length;
+    $('r-index').textContent = index;
+    $('r-winner').textContent = winner;
+
+    // verdict against optional claimed winner
+    const claimed = $('claimed').value.trim();
+    const verdict = $('verdict'), glyph = $('glyph');
+    if(claimed){
+      const match = claimed === winner;
+      verdict.classList.toggle('bad', !match);
+      glyph.textContent = match ? '✓' : '✕';
+      $('verdict-t').textContent = match ? 'Match — the draw checks out' : 'Mismatch — does not reproduce';
+      $('verdict-s').textContent = match
+        ? 'The announced winner is exactly what this computation produces.'
+        : 'The announced winner is not what the public inputs produce. Something is off.';
+    } else {
+      verdict.classList.remove('bad');
+      glyph.textContent = '✓';
+      $('verdict-t').textContent = 'Winner reproduced';
+      $('verdict-s').textContent = 'Compare this npub against the announced winner.';
+    }
+    $('receipt').classList.add('show');
+    $('receipt').scrollIntoView({behavior:'smooth', block:'nearest'});
+  } catch(e){
+    showErr(e.message || String(e));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Recompute the winner';
+  }
+};
+</script>
+</body>
+</html>

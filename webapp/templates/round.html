@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}{{ r.round_id }} — Raffle operator{% endblock %}
+{% block content %}
+<div class="crumb"><a href="{{ url_for('index') }}">rounds</a> / {{ r.round_id }}</div>
+<h1>{{ r.round_id }} <span class="pill {{ r.status.value }}">{{ r.status.value }}</span></h1>
+
+{# lifecycle stepper — signature element, encodes the real sequence #}
+{% set order = ['open','closed','published','drawn'] %}
+{% set names = {'open':'Entries','closed':'Sealed','published':'Published','drawn':'Drawn'} %}
+{% set cur = order.index(r.status.value) %}
+<div class="steps">
+  {% for st in order %}
+    {% set i = loop.index0 %}
+    <div class="s {{ 'done' if i < cur else ('active' if i == cur else '') }}">
+      <div class="num">0{{ loop.index }}</div>
+      <div class="nm">{{ names[st] }}</div>
+    </div>
+  {% endfor %}
+</div>
+
+{% if r.status == Status.DRAWN %}
+<div class="winner-box">
+  <div class="lab">Winner</div>
+  <div class="np">{{ r.winner }}</div>
+  <div class="reduce">seed mod {{ r.entries|length }} = {{ r.winner_index }} ·
+    seed {{ r.seed_hex[:24] }}… · verify independently at <a href="/verify.html">the public verifier</a></div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2>State</h2>
+  <div class="kv"><span class="k">Draw block</span><span class="v">{{ r.draw_block_height }}{% if r.extra_blocks %} (+{{ r.extra_blocks }} more){% endif %}</span></div>
+  <div class="kv"><span class="k">Entries</span><span class="v">{{ r.entries|length }}</span></div>
+  {% if r.commitment %}<div class="kv"><span class="k">Commitment</span><span class="v">{{ r.commitment }}</span></div>{% endif %}
+  {% if r.entry_event_id %}<div class="kv"><span class="k">Nostr event</span><span class="v">{{ r.entry_event_id }}</span></div>{% endif %}
+  {% if r.draw_block_hashes %}<div class="kv"><span class="k">Draw hash</span><span class="v">{{ r.draw_block_hashes|join(' + ') }}</span></div>{% endif %}
+</div>
+
+{# Stage-appropriate actions #}
+{% if r.status == Status.OPEN %}
+<div class="panel">
+  <h2>Verify a node and count an entry</h2>
+  <form method="post" action="{{ url_for('enter', round_id=r.round_id) }}">
+    <div class="field"><label for="npub">Operator npub</label>
+      <input type="text" id="npub" name="npub" placeholder="npub1…" required></div>
+    <div class="row">
+      <div class="field"><label for="ip">Node IP</label>
+        <input type="text" id="ip" name="ip" placeholder="1.2.3.4"></div>
+      <div class="field" style="max-width:120px"><label for="port">Port</label>
+        <input type="number" id="port" name="port" value="8333"></div>
+    </div>
+    <label class="check"><input type="checkbox" name="skip_check"> skip node check (already verified elsewhere)</label>
+    <div style="margin-top:14px"><button class="act" type="submit">Verify &amp; add entry</button></div>
+    <div class="note">The node IP stays here with you. Only the npub appears in the published list.</div>
+  </form>
+</div>
+
+{% if r.entries %}
+<div class="panel">
+  <h2>Entries so far ({{ r.entries|length }})</h2>
+  <div class="entries">
+    {% for e in r.entries %}<div><span class="idx">{{ loop.index0 }}</span>{{ e }}</div>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2>Seal the entry list</h2>
+  <p class="note" style="margin-top:0">Freezes the list and computes its commitment. No more entries after this.</p>
+  <form method="post" action="{{ url_for('close', round_id=r.round_id) }}">
+    <button class="act" type="submit"{% if not r.entries %} disabled{% endif %}>Seal &amp; commit</button>
+  </form>
+</div>
+
+{% elif r.status == Status.CLOSED %}
+<div class="panel">
+  <h2>Entries ({{ r.entries|length }}, sealed)</h2>
+  <div class="entries">
+    {% for e in r.entries %}<div><span class="idx">{{ loop.index0 }}</span>{{ e }}</div>{% endfor %}
+  </div>
+</div>
+<div class="panel">
+  <h2>Publish the sealed list to Nostr</h2>
+  <form method="post" action="{{ url_for('publish', round_id=r.round_id) }}">
+    <div class="field"><label for="nsec">Organizer Nostr secret key (nsec or hex)</label>
+      <input type="password" id="nsec" name="nsec" placeholder="nsec1…" autocomplete="off" required></div>
+    <div class="field"><label for="relays">Relays (one per line, blank for defaults)</label>
+      <textarea id="relays" name="relays" placeholder="wss://relay.damus.io&#10;wss://nos.lol"></textarea></div>
+    <button class="act" type="submit">Sign &amp; broadcast</button>
+    <div class="warnbox">Your secret key is used once to sign the list and is never stored. Run this
+    dashboard locally, not on a public server.</div>
+  </form>
+</div>
+
+{% elif r.status == Status.PUBLISHED %}
+<div class="panel">
+  <h2>Draw the winner</h2>
+  <p class="note" style="margin-top:0">Once block {{ r.draw_block_height }}{% if r.extra_blocks %}–{{ r.draw_block_height + r.extra_blocks }}{% endif %} is mined,
+  its hash selects the winner. Leave the field blank to fetch automatically.</p>
+  <form method="post" action="{{ url_for('do_draw', round_id=r.round_id) }}">
+    <div class="field"><label for="block_hash">Block hash (optional — one per line)</label>
+      <textarea id="block_hash" name="block_hash" placeholder="fetch automatically if blank"></textarea></div>
+    <div class="field"><label for="rpc">Bitcoin Core RPC URL (optional — else mempool.space)</label>
+      <input type="text" id="rpc" name="rpc" placeholder="http://user:pass@127.0.0.1:8332"></div>
+    <button class="act" type="submit">Draw winner</button>
+    <div class="note">Prefer your own node's RPC for the real draw — a public explorer reintroduces
+    a trusted party for the single most important input.</div>
+  </form>
+</div>
+
+{% elif r.status == Status.DRAWN %}
+<div class="panel">
+  <h2>Final entry list ({{ r.entries|length }})</h2>
+  <div class="entries">
+    {% for e in r.entries %}<div><span class="idx">{{ loop.index0 }}</span>{% if loop.index0 == r.winner_index %}<strong style="color:var(--btc)">{{ e }} ← winner</strong>{% else %}{{ e }}{% endif %}</div>{% endfor %}
+  </div>
+  <div class="note">Pay the winner from the multisig and publish the payout txid to close the round.</div>
+</div>
+{% endif %}
+{% endblock %}
