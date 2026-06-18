@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}Raffle operator{% endblock %}</title>
+<title>{% block title %}Bitcoin Node Raffle — Operator{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -11,9 +11,18 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="bar">
-    <div class="mark"><span class="dot"></span> Node-runner raffle · operator</div>
-    <a class="verify-link" href="/verify.html">public verifier →</a>
+  <div class="topbar">
+    <a class="brand" href="/">
+      <div class="brand-icon">₿</div>
+      <div class="brand-text">
+        <div class="brand-name">Bitcoin Node Raffle</div>
+        <div class="brand-tag">Operator dashboard</div>
+      </div>
+    </a>
+    <div class="topbar-links">
+      <a href="/verify.html">public verifier</a>
+      <a href="#" class="pill-link">operator</a>
+    </div>
   </div>
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, msg in messages %}

@@ -1,40 +1,43 @@
 {% extends "base.html" %}
-{% block title %}Rounds — Raffle operator{% endblock %}
+{% block title %}Rounds — Bitcoin Node Raffle Operator{% endblock %}
 {% block content %}
-<h1>Rounds</h1>
-<div class="crumb">Run a round through five stages: announce → verify entries → seal → publish → draw.</div>
 
-<div class="panel">
-  <h2>Open rounds</h2>
-  {% if rounds %}
-    {% for r in rounds %}
-      <div class="round-card">
-        <div>
-          <div class="id">{{ r.round_id }}
-            <span class="pill {{ r.status.value }}">{{ r.status.value }}</span></div>
-          <div class="meta">block {{ r.draw_block_height }}{% if r.extra_blocks %}+{{ r.extra_blocks }}{% endif %}
-            · {{ r.entries|length }} entr{{ 'y' if r.entries|length == 1 else 'ies' }}
-            · max {{ r.max_entries_per_ip }} per IP
-            {%- if r.winner %} · winner {{ r.winner[:18] }}…{% endif %}</div>
-        </div>
-        <a class="open" href="{{ url_for('round_detail', round_id=r.round_id) }}">open →</a>
-      </div>
-    {% endfor %}
-  {% else %}
-    <div class="empty">No rounds yet. Create one below to begin.</div>
-  {% endif %}
+<div class="page-header">
+  <h1>Rounds</h1>
+  <div class="sub">Manage the full lifecycle: announce → verify entries → seal → publish → draw.</div>
 </div>
 
-<div class="panel">
+{% if rounds %}
+  {% for r in rounds %}
+    <div class="round-card">
+      <div>
+        <div class="id">{{ r.round_id }} <span class="pill {{ r.status.value }}">{{ r.status.value }}</span></div>
+        <div class="meta">
+          block {{ r.draw_block_height }}{% if r.extra_blocks %} +{{ r.extra_blocks }}{% endif %}
+          · {{ r.entries|length }} entr{{ 'y' if r.entries|length == 1 else 'ies' }}
+          · max {{ r.max_entries_per_ip }}/IP
+          {%- if r.winner %} · winner {{ r.winner[:20] }}…{% endif %}
+        </div>
+      </div>
+      <a class="open" href="{{ url_for('round_detail', round_id=r.round_id) }}">open →</a>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="panel">
+    <div class="empty">No rounds yet. Create one below to get started.</div>
+  </div>
+{% endif %}
+
+<div class="panel" style="margin-top:8px">
   <h2>Open a new round</h2>
   <form method="post" action="{{ url_for('create') }}">
     <div class="field">
       <label for="round_id">Round name</label>
-      <input type="text" id="round_id" name="round_id" placeholder="2026-07" required>
+      <input type="text" id="round_id" name="round_id" placeholder="e.g. 2026-07" required>
     </div>
     <div class="row">
       <div class="field">
-        <label for="draw_height">Draw block height (a future block)</label>
+        <label for="draw_height">Draw block height</label>
         <input type="number" id="draw_height" name="draw_height" placeholder="920000" required>
       </div>
       <div class="field">
@@ -42,13 +45,12 @@
         <input type="number" id="extra_blocks" name="extra_blocks" value="0" min="0">
       </div>
       <div class="field">
-        <label for="max_entries_per_ip">Max entries per IP (Sybil cap)</label>
+        <label for="max_entries_per_ip">Max entries per IP</label>
         <input type="number" id="max_entries_per_ip" name="max_entries_per_ip" value="1" min="1">
       </div>
     </div>
     <button class="act" type="submit">Open round</button>
-    <div class="note">Announce the block height publicly the moment the round opens — before
-    entries close — so its hash is unknowable to everyone, including you.</div>
+    <p class="note">Announce the block height publicly the moment the round opens — before entries close — so its hash is unknowable to everyone, including you.</p>
   </form>
 </div>
 {% endblock %}

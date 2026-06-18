@@ -1,76 +1,124 @@
 {% extends "public_base.html" %}
-{% block title %}Enter — {{ r.round_id }}{% endblock %}
+{% block title %}Enter — {{ r.round_id }} · Bitcoin Node Raffle{% endblock %}
 {% block content %}
-
-<div class="crumb">round / {{ r.round_id }}</div>
-<h1>Enter the raffle</h1>
-
-<div class="panel">
-  <div class="kv"><span class="k">Round</span><span class="v">{{ r.round_id }}</span></div>
-  <div class="kv"><span class="k">Status</span><span class="v">
-    <span class="pill {{ r.status.value }}">{{ r.status.value }}</span></span></div>
-  <div class="kv"><span class="k">Draw block</span><span class="v">{{ r.draw_block_height }}{% if r.extra_blocks %} + {{ r.extra_blocks }} more{% endif %}</span></div>
-  <div class="kv"><span class="k">Entries so far</span><span class="v">{{ r.entries|length }}</span></div>
-  <div class="kv"><span class="k">Max entries per IP</span><span class="v">{{ r.max_entries_per_ip }}</span></div>
-</div>
 
 {% if r.status.value == 'open' %}
 
-<div class="panel">
-  <h2>Submit your entry</h2>
-  <form method="post" action="{{ url_for('public_enter', round_id=r.round_id) }}">
-    <div class="field">
-      <label for="npub">Your Nostr public key (npub)</label>
-      <input type="text" id="npub" name="npub" placeholder="npub1…" required autocomplete="off">
+<div class="hero">
+  <div class="hero-badge"><span class="dot"></span> Round {{ r.round_id }} · entries open</div>
+  <h1>Win <span class="accent">bitcoin</span> for<br>running a full node</h1>
+  <p class="hero-sub">Prove your node is reachable, submit your Nostr key, and you're in.
+  The winner is drawn from a future Bitcoin block hash — no trust required.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="val">{{ r.entries|length }}</div>
+      <div class="lbl">Entries so far</div>
     </div>
-    <div class="row">
-      <div class="field">
-        <label for="ip">Your Bitcoin node IP address</label>
-        <input type="text" id="ip" name="ip" placeholder="1.2.3.4" required autocomplete="off">
-      </div>
-      <div class="field" style="max-width:130px">
-        <label for="port">Port</label>
-        <input type="number" id="port" name="port" value="8333">
-      </div>
+    <div class="hero-stat">
+      <div class="val">{{ r.draw_block_height | string | replace('0', '0') }}</div>
+      <div class="lbl">Draw block</div>
     </div>
-    <button class="act" type="submit">Verify node &amp; enter</button>
-    <div class="note">
-      Your IP is used only for the node handshake check. Only your npub appears in the
-      published entry list — your IP is never stored or shared.
+    <div class="hero-stat">
+      <div class="val">{{ r.max_entries_per_ip }}</div>
+      <div class="lbl">Max per IP</div>
     </div>
-  </form>
+  </div>
 </div>
 
-<div class="panel">
-  <h2>How it works</h2>
-  <div class="kv"><span class="k">01 · Node check</span><span class="v" style="text-align:left;max-width:480px">
-    We perform a Bitcoin P2P handshake with your node to confirm it's reachable on the network right now.
-  </span></div>
-  <div class="kv"><span class="k">02 · Entry counted</span><span class="v" style="text-align:left;max-width:480px">
-    Your npub is added to the list. One entry per IP address.
-  </span></div>
-  <div class="kv"><span class="k">03 · List sealed</span><span class="v" style="text-align:left;max-width:480px">
-    When entries close, the full list is committed (SHA-256) and published as a signed Nostr event across multiple relays. It cannot be altered after this point.
-  </span></div>
-  <div class="kv"><span class="k">04 · Draw</span><span class="v" style="text-align:left;max-width:480px">
-    Once block {{ r.draw_block_height }} is mined, its hash selects the winner: <code>hash mod N</code>.
-    Anyone can recompute this independently using the public verifier.
-  </span></div>
+<div class="cols">
+  <div>
+    <div class="panel">
+      <h2>Submit your entry</h2>
+      <form method="post" action="{{ url_for('public_enter', round_id=r.round_id) }}">
+        <div class="field">
+          <label for="npub">Your Nostr public key (npub)</label>
+          <input type="text" id="npub" name="npub" placeholder="npub1…" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="ip">Your Bitcoin node public IP</label>
+          <input type="text" id="ip" name="ip" placeholder="1.2.3.4" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="port">Port (default 8333)</label>
+          <input type="number" id="port" name="port" value="8333">
+        </div>
+        <button class="act" type="submit">Verify node &amp; enter →</button>
+        <p class="note">Your IP is used only for the handshake check. Only your npub appears in the published entry list.</p>
+      </form>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>How it works</h2>
+      <div class="how-steps">
+        <div class="how-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Node check</div>
+            <div class="step-desc">A Bitcoin P2P handshake confirms your node is live and reachable on the network right now.</div>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Entry counted</div>
+            <div class="step-desc">Your npub is added to the list. One entry per IP address.</div>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">List sealed &amp; published</div>
+            <div class="step-desc">Entries are committed with SHA-256 and published as a signed Nostr event across multiple relays. It cannot be altered after this point.</div>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Provably fair draw</div>
+            <div class="step-desc">Block {{ r.draw_block_height }}'s hash picks the winner: <code>hash mod N</code>. Anyone can recompute it independently.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Requirements</h2>
+      <div class="kv"><span class="k">Bitcoin full node</span><span class="v">reachable on public internet</span></div>
+      <div class="kv"><span class="k">Port 8333 open</span><span class="v">or your custom port</span></div>
+      <div class="kv"><span class="k">Nostr npub</span><span class="v">any Nostr client generates one free</span></div>
+    </div>
+  </div>
 </div>
 
 {% else %}
 
-<div class="panel">
-  <div class="warnbox">
-    {% if r.status.value == 'drawn' %}
-      This round has already been drawn.
-      {% if r.winner %}The winner is <strong>{{ r.winner }}</strong>.{% endif %}
-      <a href="/verify.html">Verify the result →</a>
-    {% else %}
-      Entries for this round are closed (status: {{ r.status.value }}).
-      The draw will happen once block {{ r.draw_block_height }} is mined.
-    {% endif %}
+<div class="hero">
+  <div class="hero-badge"><span class="dot"></span> Round {{ r.round_id }}
+    <span class="pill {{ r.status.value }}" style="margin-left:4px">{{ r.status.value }}</span>
   </div>
+  <h1>Bitcoin Node Raffle</h1>
+  <p class="hero-sub">Win bitcoin for running a full node.</p>
+</div>
+
+<div class="panel">
+  {% if r.status.value == 'drawn' %}
+    <div class="winner-box" style="margin-bottom:0">
+      <div class="lab">Winner — round {{ r.round_id }}</div>
+      <div class="np">{{ r.winner }}</div>
+      <div class="reduce">
+        block {{ r.draw_block_hashes[0][:24] if r.draw_block_hashes else r.draw_block_height }}… ·
+        seed mod {{ r.entries|length }} = {{ r.winner_index }} ·
+        <a href="/verify.html">verify independently →</a>
+      </div>
+    </div>
+  {% else %}
+    <div class="infobox">
+      Entries for round <strong>{{ r.round_id }}</strong> are closed ({{ r.status.value }}).
+      The draw happens once block {{ r.draw_block_height }} is mined.
+    </div>
+  {% endif %}
 </div>
 
 {% endif %}

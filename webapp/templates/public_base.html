@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}Node-runner raffle{% endblock %}</title>
+<title>{% block title %}Bitcoin Node Raffle{% endblock %}</title>
+<meta name="description" content="Win bitcoin for running a Bitcoin full node. Provably fair draw seeded by a future block hash.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -11,9 +12,17 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="bar">
-    <div class="mark"><span class="dot"></span> Node-runner raffle</div>
-    <a class="verify-link" href="/verify.html">verify a draw →</a>
+  <div class="topbar">
+    <a class="brand" href="/">
+      <div class="brand-icon">₿</div>
+      <div class="brand-text">
+        <div class="brand-name">Bitcoin Node Raffle</div>
+        <div class="brand-tag">Win bitcoin for running a full node</div>
+      </div>
+    </a>
+    <div class="topbar-links">
+      <a href="/verify.html" class="pill-link">Verify a draw →</a>
+    </div>
   </div>
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, msg in messages %}
