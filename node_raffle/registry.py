@@ -11,6 +11,7 @@ Lifecycle:  OPEN -> CLOSED -> PUBLISHED -> DRAWN
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -18,12 +19,16 @@ from pathlib import Path
 
 from . import draw
 
+# Default max entries allowed per source IP address.
+# Override via MAX_ENTRIES_PER_IP env var or the max_entries_per_ip parameter.
+_DEFAULT_MAX_PER_IP = int(os.environ.get("MAX_ENTRIES_PER_IP", "1"))
+
 
 class Status(str, Enum):
-    OPEN = "open"          # accepting verified entries
-    CLOSED = "closed"      # entry list frozen + committed
+    OPEN = "open"            # accepting verified entries
+    CLOSED = "closed"        # entry list frozen + committed
     PUBLISHED = "published"  # sealed list broadcast to Nostr
-    DRAWN = "drawn"        # winner selected from the block hash
+    DRAWN = "drawn"          # winner selected from the block hash
 
 
 @dataclass
@@ -42,17 +47,42 @@ class RaffleRound:
     winner: str | None = None
     winner_index: int | None = None
     seed_hex: str | None = None
+    max_entries_per_ip: int = _DEFAULT_MAX_PER_IP
+    # Maps IP address -> list of npubs entered from that IP. Not part of the
+    # public entry list; used only for Sybil gating before entries close.
+    ip_map: dict[str, list[str]] = field(default_factory=dict)
 
     # --- entry stage ---
-    def add_entry(self, npub: str) -> bool:
-        """Add a verified entry. Returns False if the round is closed or it's a dup."""
+    def add_entry(self, npub: str, source_ip: str = "") -> bool:
+        """Add a verified entry. Returns False if it's a duplicate.
+
+        Raises RuntimeError if:
+        - the round is not OPEN
+        - source_ip has already reached max_entries_per_ip for this round
+        """
         if self.status != Status.OPEN:
             raise RuntimeError(f"round is {self.status.value}, not accepting entries")
         npub = npub.strip()
         if npub in self.entries:
             return False
+
+        if source_ip:
+            seen_from_ip = self.ip_map.get(source_ip, [])
+            if len(seen_from_ip) >= self.max_entries_per_ip:
+                raise RuntimeError(
+                    f"IP {source_ip} already has {len(seen_from_ip)} "
+                    f"entr{'y' if len(seen_from_ip) == 1 else 'ies'} "
+                    f"(max {self.max_entries_per_ip} per IP)"
+                )
+            seen_from_ip.append(npub)
+            self.ip_map[source_ip] = seen_from_ip
+
         self.entries.append(npub)
         return True
+
+    def ip_entry_count(self, ip: str) -> int:
+        """How many entries have been submitted from this IP."""
+        return len(self.ip_map.get(ip, []))
 
     # --- seal stage ---
     def close(self) -> str:
@@ -98,6 +128,9 @@ class RaffleRound:
     def from_dict(cls, d: dict) -> "RaffleRound":
         d = dict(d)
         d["status"] = Status(d["status"])
+        # ip_map may be absent in state files created before this field was added
+        d.setdefault("ip_map", {})
+        d.setdefault("max_entries_per_ip", _DEFAULT_MAX_PER_IP)
         return cls(**d)
 
 

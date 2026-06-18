@@ -14,6 +14,7 @@
             <span class="pill {{ r.status.value }}">{{ r.status.value }}</span></div>
           <div class="meta">block {{ r.draw_block_height }}{% if r.extra_blocks %}+{{ r.extra_blocks }}{% endif %}
             · {{ r.entries|length }} entr{{ 'y' if r.entries|length == 1 else 'ies' }}
+            · max {{ r.max_entries_per_ip }} per IP
             {%- if r.winner %} · winner {{ r.winner[:18] }}…{% endif %}</div>
         </div>
         <a class="open" href="{{ url_for('round_detail', round_id=r.round_id) }}">open →</a>
@@ -39,6 +40,10 @@
       <div class="field">
         <label for="extra_blocks">Extra blocks (hardened seed)</label>
         <input type="number" id="extra_blocks" name="extra_blocks" value="0" min="0">
+      </div>
+      <div class="field">
+        <label for="max_entries_per_ip">Max entries per IP (Sybil cap)</label>
+        <input type="number" id="max_entries_per_ip" name="max_entries_per_ip" value="1" min="1">
       </div>
     </div>
     <button class="act" type="submit">Open round</button>

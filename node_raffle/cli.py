@@ -56,7 +56,7 @@ def cmd_enter(args):
             print("not counted: node did not complete a handshake", file=sys.stderr)
             return 1
 
-    added = rnd.add_entry(args.npub)
+    added = rnd.add_entry(args.npub, source_ip=args.ip)
     store.save(rnd)
     if added:
         print(f"entry counted: {args.npub}  (total: {len(rnd.entries)})")

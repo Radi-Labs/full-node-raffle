@@ -12,10 +12,17 @@ during the publish step and is not meant to be exposed to the public internet.
 
 Public entrants don't need this; they verify draws with the standalone
 verify.html, which trusts no server at all.
+
+Basic auth
+----------
+Set RAFFLE_PASSWORD in the environment (or .env) to require a password for
+every operator-dashboard request. Leave it blank (the default) for local-only
+use with no authentication.
 """
 
 from __future__ import annotations
 
+import functools
 import os
 import sys
 from pathlib import Path
@@ -23,25 +30,86 @@ from pathlib import Path
 # Make the sibling node_raffle package importable regardless of CWD.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import (
+    Flask, render_template, request, redirect, url_for, flash,
+    Response,
+)
 
 from node_raffle import draw
 from node_raffle.check_node import check_node
 from node_raffle.registry import RaffleRound, Store, Status
 
 STATE_FILE = os.environ.get("RAFFLE_STATE", "raffle_state.json")
+_PASSWORD = os.environ.get("RAFFLE_PASSWORD", "").strip()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "dev-only-not-for-production")
 
 
+# ---------------------------------------------------------------------------
+# Basic auth
+# ---------------------------------------------------------------------------
+
+def _check_auth(password: str) -> bool:
+    return password == _PASSWORD
+
+
+def _auth_required(f):
+    """Decorator: require HTTP Basic Auth when RAFFLE_PASSWORD is set."""
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        if not _PASSWORD:
+            return f(*args, **kwargs)
+        auth = request.authorization
+        if auth and _check_auth(auth.password):
+            return f(*args, **kwargs)
+        return Response(
+            "Operator dashboard — authentication required.",
+            401,
+            {"WWW-Authenticate": 'Basic realm="Raffle operator"'},
+        )
+    return decorated
+
+
+def _apply_auth(app_):
+    """Apply auth to every route on the app."""
+    app_.before_request(_gate)
+
+_auth_checked = False
+
+def _gate():
+    global _auth_checked
+    if not _PASSWORD:
+        return None
+    # allow the verifier page through without a password — it's public
+    if request.path == "/verify.html":
+        return None
+    auth = request.authorization
+    if auth and _check_auth(auth.password):
+        return None
+    return Response(
+        "Operator dashboard — authentication required.",
+        401,
+        {"WWW-Authenticate": 'Basic realm="Raffle operator"'},
+    )
+
+app.before_request(_gate)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
 def store() -> Store:
     return Store(STATE_FILE)
 
 
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
 @app.route("/verify.html")
 def verifier():
-    # Serve the standalone client-side verifier (sits one level up).
     from flask import send_from_directory
     return send_from_directory(Path(__file__).resolve().parent.parent, "verify.html")
 
@@ -80,8 +148,14 @@ def create():
         flash("Draw block height must be a number.", "error")
         return redirect(url_for("index"))
     extra = int(request.form.get("extra_blocks", 0) or 0)
+    max_per_ip = int(request.form.get("max_entries_per_ip", 1) or 1)
 
-    s.save(RaffleRound(round_id=round_id, draw_block_height=draw_height, extra_blocks=extra))
+    s.save(RaffleRound(
+        round_id=round_id,
+        draw_block_height=draw_height,
+        extra_blocks=extra,
+        max_entries_per_ip=max_per_ip,
+    ))
     flash(f"Round {round_id!r} opened. Announce block {draw_height} publicly now.", "ok")
     return redirect(url_for("round_detail", round_id=round_id))
 
@@ -110,7 +184,7 @@ def enter(round_id):
         flash(f"Node verified: {result.user_agent} at height {result.start_height}.", "ok")
 
     try:
-        added = rnd.add_entry(npub)
+        added = rnd.add_entry(npub, source_ip=ip)
     except RuntimeError as e:
         flash(str(e), "error")
         return redirect(url_for("round_detail", round_id=round_id))
